@@ -18,36 +18,42 @@ class MyApp extends StatelessWidget {
 
         primarySwatch: Colors.blue,
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const MyHomePage(title: 'Flutter Demo Home Page', body: "",),
     );
   }
 }
 
 class MyHomePage extends StatefulWidget {
-  const MyHomePage({Key? key, required this.title}) : super(key: key);
-
-
+  const MyHomePage({Key? key, required this.title, required this.body}) : super(key: key);
 
   final String title;
-
+  final String body;
   @override
   State<MyHomePage> createState() => _MyHomePageState();
 }
-Future _firebaseBackgroundHandler(RemoteMessage message) async {
-  print(message.data.toString());
-  print(message.notification!.title);
+
+Future _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  print("Handling a background message: ${message.messageId}");
 }
 class PushNotification {
   PushNotification({
     this.title,
     this.body,
+    this.dataTitle,
+    this.dataBody,
   });
 
   String? title;
   String? body;
+  String? dataTitle;
+  String? dataBody;
 }
-class _MyHomePageState extends State<MyHomePage> {
 
+
+
+class _MyHomePageState extends State<MyHomePage> {
+  late int _totalNotifications;
+  PushNotification? _notificationInfo;
   List<PushNotification> _listNotification  = [];
 
   void registerNotification() async {
@@ -62,7 +68,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
     FirebaseMessaging.instance.getInitialMessage().then((message)=> null);
 
-    FirebaseMessaging.onBackgroundMessage(_firebaseBackgroundHandler);
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       if(message.notification != null){
@@ -71,9 +77,12 @@ class _MyHomePageState extends State<MyHomePage> {
         print(message.notification!.body);
       };
 
+
       PushNotification newNotification = PushNotification(
         title: message.notification?.title,
         body: message.notification?.body,
+        dataTitle: message.data['title'],
+        dataBody: message.data['body'],
       );
       setState(() {
         _listNotification = List.from(_listNotification)
@@ -106,20 +115,36 @@ class _MyHomePageState extends State<MyHomePage> {
             return AlertDialog(
               title: Text(message.notification!.title.toString()),
               content: Text(message.notification!.body!),
-              actions: [
+              actions: <Widget>[
                 TextButton(
-                  child: Text("Ok"),
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                )
+                  onPressed: () => Navigator.pop(context, 'Cancel'),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context, 'OK'),
+                  child: const Text('OK'),
+                ),
               ],
             );
           });
     });
   }
 
+  void removeItem(var index){
+    List<PushNotification> _newList = _listNotification;
+    var n = _newList.removeAt(index);
 
+    setState(() {
+      _listNotification = _newList;
+    });
+  }
+
+  void removeItemAll(){
+    print("Clear Notification");
+    setState(() {
+      _listNotification = [];
+    });
+  }
 
   @override
   void initState() {
@@ -127,6 +152,7 @@ class _MyHomePageState extends State<MyHomePage> {
     super.initState();
     registerNotification();
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -136,9 +162,70 @@ class _MyHomePageState extends State<MyHomePage> {
 
         title: Text(widget.title),
       ),
-      body: Center(
+      body: ListView.separated(
+
+        physics: BouncingScrollPhysics(),
+        padding: const EdgeInsets.all(8),
+        itemCount: _listNotification.length,
+        itemBuilder:(BuildContext context, int index) {
+        return  Container(
+          height: 50,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              
+              Text(
+                'TITLE: ${_notificationInfo!.title}',
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight:  FontWeight.bold,
+                    color: Colors.blue
+                ),
+              ),
+              Text(
+                'BODY: ${_notificationInfo!.body}',
+                style: TextStyle(
+                    fontSize: 14,
+                    fontWeight:  FontWeight.w500,
+                    fontStyle: FontStyle.italic,
+                    color: Colors.teal
+                ),
+              ),
+              IconButton(
+                  onPressed: ()=>showDialog<String>(
+                    context: context,
+                    builder: (BuildContext context) => AlertDialog(
+                      title: Text(widget.title),
+                      content: Text(widget.body),
+                      actions: <Widget>[
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, 'Cancel'),
+                          child: const Text('Cancel'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, 'OK'),
+                          child: const Text('OK'),
+                        ),
+                      ],
+                    ),
+                  ),
 
 
+                  icon: Icon(
+                      Icons.arrow_drop_down, color: Colors.red
+                  )
+              )
+            ],
+          ),
+        );
+
+        },
+        separatorBuilder: (BuildContext context, int index) => const Divider(),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => removeItemAll(),
+        backgroundColor: Colors.red,
+        child: const Icon(Icons.remove_circle_outline),
       ),
      
     );
